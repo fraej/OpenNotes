@@ -292,7 +292,11 @@ class EditorModule {
     try {
       let text = '';
       if (this.currentFileType === 'markdown') {
-        text = this.currentEditor.getMarkdown();
+  text = this.currentEditor.getMarkdown();
+  // Fix: ToastUI WYSIWYG often escapes LaTeX commands (e.g. \\alpha) when toggling modes.
+  // We post-process math segments so that command backslashes aren't doubled, while keeping
+  // legitimate line breaks ("\\" at line ends / before whitespace) intact.
+  text = this._fixLatexEscapesInMarkdown(text);
       } else if (this.currentFileType === 'html') {
         text = this.currentEditor.getContents();
         text = this._normalizeHTMLMedia(text);
@@ -374,6 +378,41 @@ class EditorModule {
   }
 
   forceReset() { this.cleanupEditor(); }
+
+  /* =============================
+   * LaTeX backslash de-duplication for markdown math
+   * ===========================*/
+  _fixLatexEscapesInMarkdown(md) {
+    if (!md || typeof md !== 'string') return md;
+    // Regex matches: $$block$$ | $inline$ | \[display\] | \(inline\)
+    const mathRe = /(\$\$[\s\S]*?\$\$|\$[^$\n][\s\S]*?\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\))/g;
+    return md.replace(mathRe, (seg) => {
+      let opener = '', closer = '', body = '';
+      if (seg.startsWith('$$')) {
+        opener = '$$'; closer = '$$'; body = seg.slice(2, -2);
+      } else if (seg.startsWith('\\[')) {
+        opener = '\\['; closer = '\\]'; body = seg.slice(2, -2); // remove leading \\[ and trailing \\]
+      } else if (seg.startsWith('\\(')) {
+        opener = '\\('; closer = '\\)'; body = seg.slice(2, -2);
+      } else if (seg.startsWith('$')) {
+        opener = '$'; closer = '$'; body = seg.slice(1, -1);
+      } else {
+        return seg; // unknown pattern
+      }
+
+      // Transform body:
+      // 1. Collapse \\letter -> \letter
+      // 2. Collapse \\{, \\}, \\(, \\), \\[ , \\] (escaped delimiters)
+      // 3. Leave \\ followed by space, newline or & (matrix row / alignment) untouched.
+      const fixed = body
+        // commands (letters)
+        .replace(/\\\\([a-zA-Z]+)/g, '\\$1')
+        // escaped grouping/delimiter chars
+        .replace(/\\\\([{}()\[\]])/g, '\\$1');
+
+      return opener + fixed + closer;
+    });
+  }
 }
 
 window.EditorModule = EditorModule;
