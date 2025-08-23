@@ -1,0 +1,294 @@
+/* Basic layout and light theming */
+:root {
+  --bg: #ffffff;
+  --panel: #f8f9fa;
+  --panel-2: #f1f3f4;
+  --text: #212529;
+  --muted: #6c757d;
+  --accent: #0d6efd;
+  --border: #dee2e6;
+  --success: #198754;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+.sidebar-topbar {
+  padding: 8px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sidebar-topbar-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.sidebar-topbar-content #rootPath {
+  font-size: 12px;
+  word-break: break-all;
+  line-height: 1.2;
+}
+.sidebar-status {
+  font-size: 11px;
+  line-height: 1.2;
+}
+.muted { color: var(--muted); }
+
+.layout { display: grid; grid-template-columns: 320px 4px 1fr; height: 100vh; }
+.sidebar {
+  border-right: none;
+  background: var(--panel-2);
+  overflow: auto; /* Allow both horizontal and vertical scrolling */
+}
+.splitter {
+  background: var(--border);
+  cursor: col-resize;
+  user-select: none;
+}
+.splitter:hover {
+  background: var(--accent);
+}
+.sidebar-header { 
+  padding: 6px 8px; 
+  border-bottom: 1px solid var(--border); 
+  background: var(--panel); 
+  display: flex;
+  gap: 4px;
+}
+.tree-btn {
+  padding: 2px 6px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  flex: 1;
+}
+.tree-btn:hover {
+  filter: brightness(1.1);
+}
+.viewer { 
+  position: relative; 
+  overflow-y: auto; /* Only vertical scrolling */
+  overflow-x: hidden; /* No horizontal scrolling */
+}
+.placeholder { padding: 16px; color: var(--muted); }
+
+button.primary {
+  padding: 6px 12px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+button.primary:hover { filter: brightness(1.07); }
+
+.tree { padding: 4px; min-width: 0; }
+.tree ul { list-style: none; margin: 0; padding-left: 14px; min-width: 0; }
+.tree li { margin: 1px 0; min-width: 0; }
+.tree .item { 
+  display: flex; 
+  align-items: center; 
+  gap: 4px; 
+  padding: 2px 4px; 
+  border-radius: 3px; 
+  cursor: pointer; 
+  font-size: 13px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+.tree .item:hover { background: rgba(255,255,255,0.05); }
+.tree .item.active { background: rgba(13, 110, 253, 0.15); }
+.tree .twisty { 
+  width: 12px; 
+  display: inline-flex; 
+  justify-content: center; 
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.tree .name { 
+  white-space: nowrap; 
+  overflow: visible; 
+  min-width: max-content;
+  flex-shrink: 0;
+}
+.tree .badge { color: var(--muted); font-size: 11px; flex-shrink: 0; }
+
+.viewer .content { 
+  padding: 24px; 
+  max-width: 1200px; 
+  margin: 0 auto;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+.viewer iframe.pdf-frame { width: 100%; height: 100vh; border: 0; background: #ffffff; }
+
+/* Markdown content defaults */
+.viewer .content :where(h1,h2,h3) { border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.viewer .content code { background: #f8f9fa; border: 1px solid var(--border); border-radius: 4px; padding: 1px 4px; word-break: break-all; }
+.viewer .content pre { overflow-x: hidden; word-wrap: break-word; white-space: pre-wrap; }
+.viewer .content pre code { display: block; padding: 12px; word-break: break-all; }
+.viewer .content a { color: #0d6efd; }
+.viewer .content blockquote { border-left: 3px solid var(--border); margin: 0; padding-left: 12px; color: var(--muted); }
+.viewer .content table { max-width: 100%; table-layout: fixed; word-wrap: break-word; }
+.viewer .content td, .viewer .content th { word-wrap: break-word; overflow-wrap: break-word; }
+
+/* KaTeX tweaks for light background and no scrollbars */
+.katex { color: var(--text); }
+.katex-display {
+  padding: 2px 1px;
+  margin: 0.8em 0;
+  /* Remove scrollbars but keep proper layout */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.katex-display::-webkit-scrollbar {
+  display: none;
+}
+
+/* Editor Module Styles */
+.edit-button {
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.edit-button:hover {
+  background: #005a9e !important;
+  transform: translateY(-1px);
+}
+
+.edit-button:active {
+  transform: translateY(0);
+}
+
+.save-cancel-container {
+  transition: opacity 0.2s;
+}
+
+.save-btn:hover {
+  background: #218838 !important;
+  transform: translateY(-1px);
+}
+
+.cancel-btn:hover {
+  background: #c82333 !important;
+  transform: translateY(-1px);
+}
+
+.save-btn, .cancel-btn {
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.save-btn:active, .cancel-btn:active {
+  transform: translateY(0);
+}
+
+/* Toolbar button styles */
+.toolbar-done-btn, .toolbar-save-btn, .toolbar-cancel-btn {
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.toolbar-done-btn:hover, .toolbar-save-btn:hover {
+  background: #218838 !important;
+  transform: translateY(-1px);
+}
+
+.toolbar-cancel-btn:hover {
+  background: #c82333 !important;
+  transform: translateY(-1px);
+}
+
+.toolbar-done-btn:active, .toolbar-save-btn:active, .toolbar-cancel-btn:active {
+  transform: translateY(0);
+}
+
+.toolbar-button-container {
+  gap: 8px;
+}
+
+#editor-container {
+  background: #ffffff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.editor-toolbar {
+  border-bottom: 1px solid #ddd;
+  background: #f8f9fa;
+}
+
+.editor-title {
+  color: #333;
+  font-size: 14px;
+}
+
+.done-editing-btn:hover {
+  background: #005a9e !important;
+}
+
+.done-editing-btn:active {
+  background: #004785 !important;
+}
+
+/* Toast Editor Styling */
+.toastui-editor-defaultUI {
+  border: none;
+}
+
+.toastui-editor-toolbar {
+  border-bottom: 1px solid #e0e0e0;
+}
+
+/* SunEditor Styling */
+.sun-editor {
+  border: none;
+}
+
+.se-toolbar {
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.se-wrapper {
+  border: none;
+}
+
+/* Make sure editors fill the available space */
+#editor-wrapper {
+  min-height: 0;
+}
+
+#editor-wrapper .toastui-editor,
+#editor-wrapper .sun-editor {
+  height: 100% !important;
+}
+
+#editor-wrapper .toastui-editor .toastui-editor-defaultUI {
+  height: 100%;
+}
+
+#editor-wrapper .toastui-editor .toastui-editor-main {
+  height: calc(100% - 49px); /* Subtract toolbar height */
+}
+
+#editor-wrapper .sun-editor .se-container {
+  height: 100%;
+}
+
+#editor-wrapper .sun-editor .se-wrapper {
+  height: calc(100% - 49px); /* Subtract toolbar height */
+}

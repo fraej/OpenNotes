@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OpenNotes – Local Documents Viewer</title>
+  <meta name="description"
+    content="Visualize local HTML, Markdown, and PDF documents with a folder tree and LaTeX rendering." />
+
+  <!-- KaTeX CSS for math rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+
+<body>
+  <main class="layout">
+    <aside class="sidebar" id="sidebar">
+      <header class="sidebar-topbar">
+  <button id="openFolderBtn" class="primary">Open Folder</button>
+        <div class="sidebar-topbar-content">
+          <span id="rootPath" class="muted"></span>
+          <div class="sidebar-status">
+            <span id="status" class="muted">Ready</span>
+          </div>
+        </div>
+      </header>
+      <div class="sidebar-header">
+        <button id="collapseAllBtn" class="tree-btn">Collapse All</button>
+        <button id="expandAllBtn" class="tree-btn">Expand All</button>
+      </div>
+      <nav id="tree" class="tree" aria-label="Folder tree"></nav>
+    </aside>
+    <div class="splitter" id="splitter"></div>
+    <section class="viewer" id="viewer">
+      <div class="placeholder">
+        <h2>Welcome</h2>
+        <p>Pick a folder to browse and preview documents.</p>
+        <ul>
+          <li>Supported types: <strong>.md</strong>, <strong>.html</strong>, <strong>.pdf</strong></li>
+          <li>LaTeX formulas supported in Markdown and HTML using KaTeX</li>
+          <li>Works without a server in Chromium-based browsers (Edge/Chrome)</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <!-- Dependencies from CDN (kept minimal) -->
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+
+  <!-- Markdown-it and math plugin -->
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it@13.0.2/dist/markdown-it.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it-katex@2.0.3/dist/markdown-it-katex.min.js"></script>
+
+  <!-- KaTeX JS (for auto-render in HTML files) -->
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+  <script src="./editor.js"></script>
+  <script src="./app.js"></script>
+</body>
+
+</html>
