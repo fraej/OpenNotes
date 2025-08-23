@@ -408,7 +408,10 @@ class EditorModule {
         // commands (letters)
         .replace(/\\\\([a-zA-Z]+)/g, '\\$1')
         // escaped grouping/delimiter chars
-        .replace(/\\\\([{}()\[\]])/g, '\\$1');
+  .replace(/\\\\([{}()\[\]])/g, '\\$1')
+  // remove unnecessary escapes before underscore/caret inside math
+  .replace(/\\(_)/g, '$1')
+  .replace(/\\(\^)/g, '$1');
 
       return opener + fixed + closer;
     });
