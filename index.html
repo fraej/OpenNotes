@@ -51,11 +51,16 @@
 
   <!-- Markdown-it and math plugin -->
   <script src="https://cdn.jsdelivr.net/npm/markdown-it@13.0.2/dist/markdown-it.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/markdown-it-katex@2.0.3/dist/markdown-it-katex.min.js"></script>
 
   <!-- KaTeX JS (for auto-render in HTML files) -->
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+  <!-- browser-fs-access fallback (ESM import) -->
+  <script type="module">
+    import * as bfs from 'https://cdn.jsdelivr.net/npm/browser-fs-access/+esm';
+    window.browserFsAccess = bfs;
+  </script>
 
   <script src="./editor.js"></script>
   <script src="./app.js"></script>

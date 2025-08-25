@@ -314,7 +314,6 @@ class EditorModule {
   async _save(content) {
     if (!this.currentNode || !this.currentNode.file) throw new Error('File handle missing');
     const name = this.currentNode.file.name;
-
     if (this.currentNode.handle) {
       const w = await this.currentNode.handle.createWritable();
       await w.write(content); await w.close();
@@ -322,8 +321,11 @@ class EditorModule {
       const h = await window.showSaveFilePicker({ suggestedName: name });
       const w = await h.createWritable();
       await w.write(content); await w.close();
+    } else if (window.browserFsAccess && window.browserFsAccess.fileSave) {
+      // Fallback: trigger a download of the updated file; user chooses where to store
+      await window.browserFsAccess.fileSave(new Blob([content], { type: this.currentNode.file.type || 'text/plain' }), { fileName: name });
     } else {
-      throw new Error('FSA API unsupported');
+      throw new Error('No available save mechanism');
     }
 
     const blob = new Blob([content], { type: this.currentNode.file.type || 'text/plain' });

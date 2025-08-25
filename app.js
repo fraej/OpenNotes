@@ -201,22 +201,46 @@ async function populateDir(containerUl, dirNode, basePath) {
 // Removed legacy buildVFSFromFileList fallback (File System Access API only)
 
 async function chooseFolder() {
-  if (!('showDirectoryPicker' in window)) {
-    alert('This app requires a Chromium-based browser supporting showDirectoryPicker.');
-    return;
-  }
-  try {
-    setStatus('Opening directory picker...');
-    const directoryHandle = await window.showDirectoryPicker();
-    await loadDirectoryWithHandle(directoryHandle);
-  } catch (error) {
-    if (error.name !== 'AbortError') {
-      console.error('Error opening directory:', error);
-      setStatus('Error opening directory');
-    } else {
-      setStatus('Ready');
+  // Primary: native File System Access API
+  if ('showDirectoryPicker' in window) {
+    try {
+      setStatus('Opening directory picker...');
+      const directoryHandle = await window.showDirectoryPicker();
+      await loadDirectoryWithHandle(directoryHandle);
+      return;
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.error('Error opening directory:', error);
+        setStatus('Error opening directory');
+      } else {
+        setStatus('Ready');
+      }
+      return; // Do not fallback automatically after explicit cancellation
     }
   }
+
+  // Fallback: browser-fs-access (works in Firefox/Safari with directoryOpen)
+  if (window.browserFsAccess && window.browserFsAccess.directoryOpen) {
+    try {
+      setStatus('Opening directory (fallback)...');
+  const fileHandles = await window.browserFsAccess.directoryOpen({
+        recursive: true,
+        mode: 'read'
+      });
+      await loadDirectoryFromFileHandles(fileHandles);
+      return;
+    } catch (err) {
+      if (err?.name !== 'AbortError') {
+        console.error('Fallback directory open failed', err);
+        setStatus('Error opening directory');
+      } else {
+        setStatus('Ready');
+      }
+      return;
+    }
+  }
+
+  alert('No supported folder selection API available in this browser.');
 }
 
 // Load directory using File System Access API with write permissions
@@ -254,6 +278,59 @@ async function loadDirectoryWithHandle(directoryHandle) {
   }
   
   setStatus('Folder loaded');
+}
+
+// Fallback: build VFS from array of File objects returned by browser-fs-access directoryOpen
+async function loadDirectoryFromFileHandles(fileHandles) {
+  setStatus('Loading folder (fallback)...');
+  // Derive a pseudo-root name from first file path segment
+  const first = fileHandles[0];
+  let rootName = 'folder';
+  if (first && first.webkitRelativePath) {
+    rootName = first.webkitRelativePath.split('/')[0] || rootName;
+  }
+  vfsRoot = await buildVFSFromFileList(fileHandles, rootName);
+  window.directoryHandle = null; // no writable root
+  updateWindowExports();
+
+  ui.tree.textContent = '';
+  const rootUl = document.createElement('ul');
+  ui.tree.appendChild(rootUl);
+  ui.rootPath.textContent = `Selected (fallback): ${rootName}`;
+
+  const dirs = [];
+  const filesList = [];
+  for (const [name, child] of vfsRoot.children) {
+    if (child.kind === 'directory') dirs.push([name, child]);
+    else if (isSupportedFile(name)) filesList.push([name, child]);
+  }
+  dirs.sort((a,b) => a[0].localeCompare(b[0]));
+  filesList.sort((a,b) => a[0].localeCompare(b[0]));
+  for (const [name, node] of dirs) rootUl.appendChild(makeTreeItem(name, name, node));
+  for (const [name, node] of filesList) rootUl.appendChild(makeTreeItem(name, name, node));
+  setStatus('Folder loaded (fallback)');
+}
+
+async function buildVFSFromFileList(fileList, rootName = 'root') {
+  const root = { name: rootName, kind: 'directory', children: new Map(), path: '' };
+  for (const file of fileList) {
+    const rel = file.webkitRelativePath || file.name; // directoryOpen supplies webkitRelativePath in all browsers
+    const parts = rel.split('/').filter(Boolean);
+    let dir = root;
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const isFile = i === parts.length - 1;
+      if (isFile) {
+        dir.children.set(part, { name: part, kind: 'file', file, handle: null, path: parts.slice(0, i+1).join('/') });
+      } else {
+        if (!dir.children.has(part)) {
+          dir.children.set(part, { name: part, kind: 'directory', children: new Map(), path: parts.slice(0, i+1).join('/') });
+        }
+        dir = dir.children.get(part);
+      }
+    }
+  }
+  return root;
 }
 
 // Build VFS from directory handle with file handles for writing
@@ -822,61 +899,39 @@ ui.expandAllBtn.addEventListener('click', expandAllFolders);
 
 // Initialize editor module when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-  // Feature detection for File System Access API (Chromium-based requirement)
-  const supportsFSA = 'showDirectoryPicker' in window && window.isSecureContext;
-  if (!supportsFSA) {
-    // Allow user to dismiss (persist across session)
+  // Feature detection
+  const supportsNativeFSA = 'showDirectoryPicker' in window && window.isSecureContext;
+  const hasFallback = !!(window.browserFsAccess && window.browserFsAccess.directoryOpen);
+  if (!supportsNativeFSA && !hasFallback) {
+    // Hard stop (no capability at all)
     if (!localStorage.getItem('openNotes_hideFsaWarning')) {
       const warn = document.createElement('div');
       warn.id = 'fsa-warning-banner';
-      warn.style.cssText = `
-        position: fixed; top: 0; left: 0; right: 0; z-index: 2000;
-        background: #b00020; color: #fff; padding: 12px 16px 12px 20px;
-        font-family: system-ui, sans-serif; font-size: 14px; line-height: 1.4;
-        display: flex; align-items: flex-start; gap: 14px; box-shadow: 0 2px 6px rgba(0,0,0,.25);
-      `;
+      warn.style.cssText = `position:fixed;top:0;left:0;right:0;z-index:2000;background:#b00020;color:#fff;padding:12px 16px 12px 20px;font-family:system-ui,sans-serif;font-size:14px;line-height:1.4;display:flex;align-items:flex-start;gap:14px;box-shadow:0 2px 6px rgba(0,0,0,.25);`;
       const msg = document.createElement('div');
-      msg.innerHTML = `⚠️ <strong>Unsupported Browser:</strong> This app now relies exclusively on the File System Access API (Chromium only). Your browser cannot open folders or display documents. Please switch to a Chromium-based browser (Chrome, Edge, Brave, Arc, etc.).`;
+      msg.innerHTML = `⚠️ <strong>Unsupported Browser:</strong> No folder selection API available. Please use a modern Chromium, Firefox (with directory upload), or Safari version.`;
       const closeBtn = document.createElement('button');
-      closeBtn.type = 'button';
-      closeBtn.ariaLabel = 'Dismiss warning';
-      closeBtn.textContent = '✕';
-      closeBtn.style.cssText = `
-        margin-left: auto; background: transparent; border: none; color: #fff;
-        font-size: 16px; cursor: pointer; line-height: 1; padding: 4px 8px;
-      `;
-      closeBtn.addEventListener('click', () => {
-        warn.style.transition = 'opacity .25s';
-        warn.style.opacity = '0';
-        setTimeout(() => warn.remove(), 250);
-        localStorage.setItem('openNotes_hideFsaWarning', '1');
-      });
-      warn.appendChild(msg);
-      warn.appendChild(closeBtn);
-      document.body.appendChild(warn);
-    }
-    if (ui.openBtn) {
-      ui.openBtn.disabled = true;
-      ui.openBtn.title = 'Disabled: File System Access API not available';
-    }
-    // Dim main layout to indicate unusable state
-    const layout = document.querySelector('.layout');
-    if (layout) {
-      layout.style.filter = 'grayscale(0.6)';
-      layout.style.pointerEvents = 'none';
-    }
-    // Replace viewer content with hard stop message
-    if (ui.viewer) {
-      ui.viewer.innerHTML = '<div class="placeholder" style="padding:2rem;max-width:640px;margin:0 auto;font-size:16px;line-height:1.5">This browser does not support the required File System Access API.<br><br><strong>OpenNotes cannot function here.</strong><br><br>Please reopen this page in a Chromium-based browser (Chrome, Edge, Brave, etc.).</div>';
+      closeBtn.type = 'button'; closeBtn.ariaLabel = 'Dismiss warning'; closeBtn.textContent = '✕';
+      closeBtn.style.cssText = 'margin-left:auto;background:transparent;border:none;color:#fff;font-size:16px;cursor:pointer;line-height:1;padding:4px 8px;';
+      closeBtn.addEventListener('click', () => { warn.style.transition='opacity .25s'; warn.style.opacity='0'; setTimeout(()=>warn.remove(),250); localStorage.setItem('openNotes_hideFsaWarning','1'); });
+      warn.appendChild(msg); warn.appendChild(closeBtn); document.body.appendChild(warn);
     }
     setStatus('Unsupported browser – cannot run');
+  } else if (!supportsNativeFSA && hasFallback) {
+    // Degraded mode banner
+    if (!localStorage.getItem('openNotes_hideFallbackWarning')) {
+      const warn = document.createElement('div');
+      warn.id = 'fallback-warning-banner';
+      warn.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2000;background:#d17b00;color:#fff;padding:12px 16px 12px 20px;font:14px system-ui,sans-serif;display:flex;gap:14px;align-items:flex-start;box-shadow:0 2px 6px rgba(0,0,0,.25)';
+      const msg = document.createElement('div');
+      msg.innerHTML = 'ℹ️ <strong>Limited Mode:</strong> Native File System Access API not available. Using fallback; editing saves will prompt downloads instead of in-place writes.';
+      const closeBtn = document.createElement('button');
+      closeBtn.type='button'; closeBtn.textContent='✕'; closeBtn.style.cssText='margin-left:auto;background:transparent;border:none;color:#fff;font-size:16px;cursor:pointer;line-height:1;padding:4px 8px;';
+      closeBtn.addEventListener('click',()=>{warn.style.transition='opacity .25s';warn.style.opacity='0';setTimeout(()=>warn.remove(),250);localStorage.setItem('openNotes_hideFallbackWarning','1');});
+      warn.appendChild(msg); warn.appendChild(closeBtn); document.body.appendChild(warn);
+    }
   }
-  try {
-    editorModule = new EditorModule();
-    console.log('Editor module initialized');
-  } catch (error) {
-    console.error('Failed to initialize editor module:', error);
-  }
+  try { editorModule = new EditorModule(); console.log('Editor module initialized'); } catch(e){ console.error('Failed to initialize editor module:', e); }
 });
 
 // Also initialize if DOMContentLoaded has already fired
