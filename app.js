@@ -13,7 +13,8 @@ const ui = {
   sidebar: document.getElementById('sidebar'),
   splitter: document.getElementById('splitter'),
   collapseAllBtn: document.getElementById('collapseAllBtn'),
-  expandAllBtn: document.getElementById('expandAllBtn')
+  expandAllBtn: document.getElementById('expandAllBtn'),
+  showMediaToggle: document.getElementById('showMediaToggle')
 };
 
 // In-memory virtual FS built from DataTransferItemList or input files
@@ -30,6 +31,14 @@ const SUPPORTED = {
 };
 // Audio & video files are intentionally NOT added to SUPPORTED so they are not opened standalone.
 const EMBED_ONLY_AUDIO_EXTS = new Set(['mp3','wav','ogg','m4a','flac']);
+const MEDIA_FILE_EXTS = new Set([
+  'png','jpg','jpeg','gif','webp','svg','bmp','tif','tiff','avif','ico','mp4','webm','mov','mkv','avi','mp3','wav','ogg','m4a','flac'
+]);
+
+function isMediaFile(name){ return MEDIA_FILE_EXTS.has(extname(name)); }
+function isImageFile(name){ return ['png','jpg','jpeg','gif','webp','svg','bmp','tif','tiff','avif','ico'].includes(extname(name)); }
+function isVideoFile(name){ return ['mp4','webm','mov','mkv','avi'].includes(extname(name)); }
+function isAudioFile(name){ return EMBED_ONLY_AUDIO_EXTS.has(extname(name)); }
 
 function setStatus(msg) { ui.status.textContent = msg; }
 
@@ -172,9 +181,16 @@ async function populateDir(containerUl, dirNode, basePath) {
   // Collect entries and sort: folders first, then files (supported first)
   const dirs = [];
   const files = [];
+  const showMedia = ui.showMediaToggle ? ui.showMediaToggle.checked : false;
   for (const [name, child] of dirNode.children) {
-    if (child.kind === 'directory') dirs.push([name, child]);
-    else if (isSupportedFile(name)) files.push([name, child]);
+    if (child.kind === 'directory') {
+      dirs.push([name, child]);
+    } else if (isSupportedFile(name)) {
+      files.push([name, child]);
+    } else if (showMedia && isMediaFile(name)) {
+      // Allow media files only when toggle is on
+      files.push([name, child]);
+    }
   }
   dirs.sort((a,b) => a[0].localeCompare(b[0]));
   files.sort((a,b) => a[0].localeCompare(b[0]));
@@ -263,9 +279,11 @@ async function loadDirectoryWithHandle(directoryHandle) {
   // Populate the tree
   const dirs = [];
   const filesList = [];
+  const showMedia = ui.showMediaToggle ? ui.showMediaToggle.checked : false;
   for (const [name, child] of vfsRoot.children) {
     if (child.kind === 'directory') dirs.push([name, child]);
     else if (isSupportedFile(name)) filesList.push([name, child]);
+    else if (showMedia && isMediaFile(name)) filesList.push([name, child]);
   }
   dirs.sort((a,b) => a[0].localeCompare(b[0]));
   filesList.sort((a,b) => a[0].localeCompare(b[0]));
@@ -300,9 +318,11 @@ async function loadDirectoryFromFileHandles(fileHandles) {
 
   const dirs = [];
   const filesList = [];
+  const showMedia = ui.showMediaToggle ? ui.showMediaToggle.checked : false;
   for (const [name, child] of vfsRoot.children) {
     if (child.kind === 'directory') dirs.push([name, child]);
     else if (isSupportedFile(name)) filesList.push([name, child]);
+    else if (showMedia && isMediaFile(name)) filesList.push([name, child]);
   }
   dirs.sort((a,b) => a[0].localeCompare(b[0]));
   filesList.sort((a,b) => a[0].localeCompare(b[0]));
@@ -402,9 +422,15 @@ async function openFile(node, path) {
     } else if (type === 'pdf') {
       const blobUrl = URL.createObjectURL(file);
       renderPDF(blobUrl);
-    } else if (EMBED_ONLY_AUDIO_EXTS.has(ext)) {
-      // Explicit message guiding user to embed audio inside documents instead of standalone view
-      renderMessage('Audio files are not opened standalone. Embed them in a Markdown or HTML document.');
+    } else if (isImageFile(node.name)) {
+      const blobUrl = URL.createObjectURL(file);
+      renderImage(blobUrl, node.name);
+    } else if (isVideoFile(node.name)) {
+      const blobUrl = URL.createObjectURL(file);
+      renderVideo(blobUrl, node.name);
+    } else if (isAudioFile(node.name)) {
+      const blobUrl = URL.createObjectURL(file);
+      renderAudio(blobUrl, node.name);
     } else {
       renderMessage('Unsupported file selected');
     }
@@ -417,6 +443,49 @@ async function openFile(node, path) {
   }
 }
 
+function renderImage(blobUrl, name){
+  clearViewer();
+  ui.viewer.style.overflow='auto';
+  const img = document.createElement('img');
+  img.src = blobUrl;
+  img.alt = name;
+  img.style.maxWidth='100%';
+  img.style.height='auto';
+  img.style.display='block';
+  img.style.margin='0 auto';
+  ui.viewer.appendChild(img);
+}
+
+function renderVideo(blobUrl, name){
+  clearViewer();
+  ui.viewer.style.overflow='auto';
+  const video = document.createElement('video');
+  video.src = blobUrl;
+  video.controls = true;
+  video.style.maxWidth='100%';
+  video.style.display='block';
+  video.style.margin='0 auto';
+  ui.viewer.appendChild(video);
+}
+
+function renderAudio(blobUrl, name){
+  clearViewer();
+  ui.viewer.style.overflow='auto';
+  const wrapper = document.createElement('div');
+  wrapper.style.padding='1rem';
+  const title = document.createElement('div');
+  title.textContent = name;
+  title.style.fontWeight='600';
+  title.style.marginBottom='0.5rem';
+  const audio = document.createElement('audio');
+  audio.src = blobUrl;
+  audio.controls = true;
+  audio.style.width='100%';
+  wrapper.appendChild(title);
+  wrapper.appendChild(audio);
+  ui.viewer.appendChild(wrapper);
+}
+
 function clearViewer() {
   ui.viewer.textContent = '';
   // Remove any existing edit button
@@ -424,6 +493,9 @@ function clearViewer() {
   if (existingEditBtn) {
     existingEditBtn.remove();
   }
+  // Remove any existing PDF open button
+  const existingPdfBtn = document.querySelector('.pdf-open-button');
+  if (existingPdfBtn) existingPdfBtn.remove();
   // Remove any existing save/cancel container
   const existingSaveCancel = document.querySelector('.save-cancel-container');
   if (existingSaveCancel) {
@@ -797,22 +869,33 @@ function renderPDF(blobUrl) {
     return;
   }
 
-  // Desktop: still embed, but offer open-in-new-tab button
+  // Desktop: embed with floating button (similar to Edit button style)
   ui.viewer.style.overflowY = 'hidden';
   ui.viewer.style.overflowX = 'hidden';
-  const toolbar = document.createElement('div');
-  toolbar.style.cssText = 'display:flex;justify-content:flex-end;gap:8px;padding:6px 8px;background:#f5f5f5;border-bottom:1px solid #ddd;';
-  const openBtn = document.createElement('button');
-  openBtn.textContent = 'Open in New Tab';
-  openBtn.style.cssText = 'background:#007acc;color:#fff;border:none;padding:6px 10px;border-radius:4px;cursor:pointer;font-size:13px;';
-  openBtn.addEventListener('click', () => { window.open(blobUrl, '_blank'); });
-  toolbar.appendChild(openBtn);
-  ui.viewer.appendChild(toolbar);
-
   const iframe = document.createElement('iframe');
   iframe.className = 'pdf-frame';
   iframe.src = blobUrl + '#view=FitH';
   ui.viewer.appendChild(iframe);
+
+  const openBtn = document.createElement('button');
+  openBtn.className = 'pdf-open-button';
+  openBtn.textContent = 'Open PDF';
+  openBtn.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    padding: 10px 16px;
+    background: #007acc;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  `;
+  openBtn.addEventListener('click', () => { window.open(blobUrl, '_blank'); });
+  document.body.appendChild(openBtn);
 }
 
 
@@ -919,6 +1002,29 @@ function expandAllFolders() {
 
 ui.collapseAllBtn.addEventListener('click', collapseAllFolders);
 ui.expandAllBtn.addEventListener('click', expandAllFolders);
+
+// Media visibility toggle
+if (ui.showMediaToggle) {
+  ui.showMediaToggle.addEventListener('change', () => {
+    // Rebuild tree from current vfsRoot
+    if (!vfsRoot) return;
+    ui.tree.textContent = '';
+    const rootUl = document.createElement('ul');
+    ui.tree.appendChild(rootUl);
+    const dirs = [];
+    const filesList = [];
+    const showMedia = ui.showMediaToggle.checked;
+    for (const [name, child] of vfsRoot.children) {
+      if (child.kind === 'directory') dirs.push([name, child]);
+      else if (isSupportedFile(name)) filesList.push([name, child]);
+      else if (showMedia && isMediaFile(name)) filesList.push([name, child]);
+    }
+    dirs.sort((a,b)=>a[0].localeCompare(b[0]));
+    filesList.sort((a,b)=>a[0].localeCompare(b[0]));
+    for (const [name,node] of dirs) rootUl.appendChild(makeTreeItem(name,name,node));
+    for (const [name,node] of filesList) rootUl.appendChild(makeTreeItem(name,name,node));
+  });
+}
 
 // Initialize editor module when the page loads
 document.addEventListener('DOMContentLoaded', () => {
