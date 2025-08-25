@@ -1,38 +1,40 @@
 # OpenNotes
-### Local Folder Explorer + Markdown / HTML Editor (Chromium + File System Access API)
+### Local Folder Explorer + Markdown / HTML Editor (File System Access + Fallback Mode)
 
+OpenNotes is a 100% client‑side web app that lets you pick a local directory, browse a live tree, preview & edit Markdown / HTML, view PDFs, and directly preview standalone images, video, and audio files. Rendering math (KaTeX) happens at view time. All file operations stay on your machine—no server, no upload.
 
-OpenNotes is a 100% client‑side web app that lets you pick a local directory, browse a live tree, preview Markdown / HTML / PDF files, play embedded images / videos / audio (only when referenced inside documents), and edit Markdown & HTML in place. Rendering math (KaTeX) happens at view time. All file operations stay on your machine—no server, no upload.
-
-> Important: The app is **Chromium-only** (Chrome, Edge, Brave, etc.) because it uses the File System Access API (`showDirectoryPicker`). You can open it directly via `file://` (double‑click `index.html`) — a local server is optional, not required.
+> Full direct read/write works in Chromium browsers via the File System Access API. A portable fallback (using `browser-fs-access`) now enables Firefox / Safari usage with a virtual file set + "Save As" style writes (limitations noted below). You can open it directly via `file://` (double‑click `index.html`).
 
 ## ✨ Key Features
-* Real folder access via the File System Access API (no legacy `<input webkitdirectory>` fallback)
-* Lazy, expandable folder tree (incremental load of deep structures)
+* Real folder access via File System Access API (Chromium) OR portable fallback (`browser-fs-access`) for non‑Chromium browsers.
+* Lazy, expandable folder tree (incremental load for deep hierarchies).
 * Instant preview:
-	* Markdown (markdown-it + KaTeX for inline & block math after render)
-	* HTML (sanitized; KaTeX auto-render pass)
-	* PDF (native browser viewer)
-	* Embedded Audio (HTML5 `<audio>` inside Markdown/HTML docs only; no standalone audio file preview)
+	* Markdown (markdown-it + KaTeX inline & block after render)
+	* HTML (sanitized + KaTeX auto-render)
+	* PDF (mobile opens in a new tab for reliability; desktop inline with a floating "Open PDF" button)
+	* Standalone Images (centered both axes)
+	* Standalone Video (HTML5 player)
+	* Standalone Audio (HTML5 player)
+* Optional tree filter: toggle to show/hide media files (keeps tree focused on docs by default).
 * Editing:
-	* Markdown: Toast UI Editor (math not live-rendered while typing now; appears after save in viewer)
-	* HTML: SunEditor (media paths preserved; math rendered after save)
-* Media pipeline: resolves relative images / video / audio to Blob URLs without breaking original source paths on save
-* Deferred media processing eliminates transient 404s for unresolved relative assets
-* Direct save back to original file via File System Access handles
-* Offline-friendly after first CDN fetch (optionally vendor libraries)
+	* Markdown: Toast UI Editor (math rendered after save)
+	* HTML: SunEditor (math rendered after save)
+* Media pipeline: resolves relative media to Blob URLs (restores original paths on save).
+* Fallback save path automatically uses `fileSave` (download-like) when direct write is not permitted.
+* Floating UI buttons (Edit, Hide/Show Sidebar, PDF Open) for cleaner workspace.
+* Draggable (mouse + touch) splitter and collapsible sidebar with animated show/hide.
+* Offline-friendly after first CDN fetch (can vendor libraries locally).
 
 ## 🗂 Supported File Types
 | Type | Preview | Editable | Notes |
 |------|---------|----------|-------|
-| `.md` | Yes | Yes (Markdown + WYSIWYG) | Math rendered after save |
-| `.markdown` | Yes | Yes | Alias of Markdown |
-| `.html`, `.htm` | Yes | Yes (WYSIWYG) | Sanitized; math after save |
-| `.pdf` | Yes | No | Native viewer (no annotations) |
-| Audio (`.mp3`, `.wav`, `.ogg`, `.m4a`, `.flac`) embedded in docs | Yes (when embedded) | Via doc | No standalone open |
-| Embedded video (`<video>` tags) | Yes | In doc | Relative sources resolved |
-| Standalone video files (`.mp4`, `.webm`, etc.) | Indirect | No | Play via embed in HTML/MD |
-| Images (`.png`, `.jpg`, `.svg`, etc.) | Via embed | No | Resolved to Blob at runtime |
+| `.md`, `.markdown` | Yes | Yes | Math after save |
+| `.html`, `.htm` | Yes | Yes | Sanitized; math after save |
+| `.pdf` | Yes | No | Mobile opens new tab; desktop inline + FAB |
+| Images (`.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, `.webp`) | Yes (standalone + embedded) | No | Centered; original paths preserved |
+| Video (`.mp4`, `.webm`, `.ogg`) | Yes (standalone + embedded) | No | HTML5 player |
+| Audio (`.mp3`, `.wav`, `.ogg`, `.m4a`, `.flac`) | Yes (standalone + embedded) | No | HTML5 player |
+| Other text (`.txt`, `.csv`, etc.) | Basic (plain) | No | Treated as text (future enhancement) |
 
 ## 🔐 Privacy & Security Model
 * Everything runs locally in your browser process—no network upload of file contents.
@@ -41,10 +43,11 @@ OpenNotes is a 100% client‑side web app that lets you pick a local directory, 
 * Generated Blob URLs for images are revoked when no longer needed.
 
 ## ✅ Requirements
-* **Browser:** Chromium 96+ (Chrome, Edge, Brave, etc.) with File System Access API.
-* **Launch:** Either double‑click `index.html` (file://) or serve locally (optional). Both work in current Chromium builds.
-* **Permissions:** Grant read/write access to the chosen folder when prompted.
-* **First Load Assets:** External CDN scripts (editors, KaTeX) need initial network access; afterward the app can function offline (subject to browser caching policies).
+* **Best Experience:** Chromium 96+ (Chrome, Edge, Brave) for direct in-place read/write.
+* **Fallback Browsers:** Firefox, Safari, etc. via `browser-fs-access` (loads a chosen directory's files into a virtual set; saves trigger a download dialog per file).
+* **Launch:** Double‑click `index.html` (file://) or serve locally (optional).
+* **Permissions:** Accept read/write prompts (Chromium) or file picker (fallback).
+* **First Load Assets:** External CDN scripts (editors, KaTeX) need initial network; afterwards cached locally (subject to browser policies).
 
 ## 🚀 Quick Start
 1. Clone or download this repository.
@@ -63,9 +66,11 @@ Then visit `http://localhost:8080/`.
 
 ## ✏️ Editing Workflow
 * Click a file → Preview loads.
-* Press the edit button → Appropriate editor (Markdown dual-mode or HTML WYSIWYG) appears.
-* Make changes → Save writes directly back to the file handle.
-* View refreshes using the just-saved content (order of operations avoids stale caching).
+* Press the floating Edit button → Editor (Markdown or HTML) appears.
+* Make changes → Save:
+	* Chromium: writes in place via file handle.
+	* Fallback: prompts a save dialog (defaulting to original name) using `fileSave`.
+* Viewer refreshes immediately from updated content.
 
 ## 🧮 Math / LaTeX
 Math is rendered with KaTeX in the viewer (after save). While editing:
@@ -82,11 +87,12 @@ $$
 Example inline: `$E=mc^2$`.
 
 ## 🖼 Media Handling Details (Images / Video / Audio)
-* Sources in documents stay as original relative paths in saved files.
-* At render time, each relative path is resolved inside the chosen root, replaced in-DOM with a Blob URL (metadata attributes retain original path for restoration on save).
-* Missing media quietly logs a console warning; enhancement: surface a visual badge.
-* Video & audio tags with nested `<source>` elements are processed the same way.
-* During editing, blob substitution prevents the browser from firing failing `file://` requests.
+* Standalone files and embedded tags both supported now.
+* Tree shows media only when the "Show media" toggle is enabled (default hidden to reduce noise).
+* Sources remain original relative paths in saved files (Blob URLs only in-memory while viewing/editing).
+* Missing media logs a console warning (future visual indicator planned).
+* Video & audio with nested `<source>` tags processed uniformly.
+* Centering: images are flex-centered horizontally & vertically.
 
 ## 🧱 Project Structure (excerpt)
 ```
@@ -97,12 +103,13 @@ styles.css      # Core styling
 ```
 
 ## 🔄 Future Ideas / Roadmap (Not Yet Implemented)
-* Image/video/audio missing indicator & retry UI
+* Missing media indicator & retry UI
 * Rename / delete / create files & folders
 * Theme toggle (dark / light)
 * KaTeX live preview toggle in editors
 * Service worker to pin CDN assets offline
-* Standalone video file direct viewer
+* Persist user prefs (sidebar state, media toggle)
+* Basic text file editing for other extensions
 
 ## 🧪 Testing Tips
 * Nested relative paths (`../images/foo.png`) in Markdown & HTML.
@@ -112,12 +119,12 @@ styles.css      # Core styling
 * Save edited HTML with images: verify original relative paths persisted (no `blob:` in source).
 
 ## ⚠️ Limitations
-* Non-Chromium browsers are blocked (no polyfill provided).
-* Initial load needs network for CDN assets (unless you vendor them locally).
-* Very large directories: initial expansion can still be costly (lazy, but no virtualization/virtual scrolling yet).
+* Fallback mode (non‑Chromium): no true in-place overwrite; each save is a new download dialog.
+* No bulk operations (rename/create/delete) yet.
+* Very large directories: still no virtual scrolling (can be slow to expand huge nodes).
 * PDF is view-only; no annotation features.
-* Standalone audio/video files are not opened directly; embed them inside Markdown/HTML.
-* No conflict detection if files change on disk outside the app (last save wins).
+* No external change detection (last save wins if file altered outside app).
+* Initial load requires network for CDN assets unless vendored locally.
 
 ## 🛠 Local Development Notes
 No build step: plain HTML/JS/CSS.
@@ -146,18 +153,21 @@ Distributed under the GNU GPL v3 (see `LICENSE`).
 ## 🧩 Implementation Annotations
 | Feature | Key Code Locations |
 |---------|--------------------|
-| Folder tree & VFS | `app.js`: `buildVFSFromDirectoryHandle`, `populateDir` |
+| Folder tree & VFS (native) | `app.js`: `buildVFSFromDirectoryHandle`, `populateDir` |
+| Folder load fallback | `app.js`: `chooseFolder`, `loadDirectoryFromFileHandles`, `buildVFSFromFileList` |
 | File open routing | `app.js`: `openFile` |
 | Markdown render | `app.js`: `renderMarkdown` |
 | HTML render & sanitize | `app.js`: `renderHTML` |
-| Media resolution (img/video/audio) | `app.js`: `processMediaInDOM`, `processImagesInDOM` alias |
+| PDF viewer logic (mobile vs desktop) | `app.js`: `renderPDF` |
+| Standalone media render | `app.js`: `renderImage`, `renderVideo`, `renderAudio` |
+| Media resolution (embedded) | `app.js`: `processMediaInDOM` |
 | Math rendering (viewer) | `app.js`: inside `renderMarkdown` & `renderHTML` KaTeX pass |
 | Editors (Markdown / HTML) | `editor.js`: `_initToast`, `_initSun`, `startEditing` |
 | Media in editors | `editor.js`: `_refreshMedia`, `_prepareHTMLContentForEditor`, `_normalizeHTMLMedia` |
-| Save lifecycle | `editor.js`: `finishEditing`, `_save` |
-| PDF viewer | `app.js`: `renderPDF` |
-| (Embedded audio handled) | `app.js`: `processMediaInDOM` |
-| Permissions / unsupported banner | `app.js`: DOMContentLoaded section |
+| Save lifecycle + fallback | `editor.js`: `_save`, `finishEditing` |
+| Sidebar collapse + FABs | `app.js`: `collapseSidebar`, `createFloatingSidebarRestore`, `ensureHideFab` |
+| Splitter drag (mouse + touch) | `app.js`: splitter event listeners |
+| Permissions / fallback detection | `app.js`: `chooseFolder` & setup section |
 
 ## 🤝 Contributing
 Issues & PRs welcome—please keep changes lean (no heavy build pipeline). Open a PR with a concise description & rationale.

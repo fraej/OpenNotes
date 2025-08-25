@@ -921,6 +921,7 @@ ui.openBtn.addEventListener('click', chooseFolder);
 let isDragging = false;
 let startX = 0;
 let startWidth = 0;
+let lastSidebarWidth = 320; // remember last non-collapsed width
 
 ui.splitter.addEventListener('mousedown', (e) => {
   isDragging = true;
@@ -933,9 +934,14 @@ ui.splitter.addEventListener('mousedown', (e) => {
 
 document.addEventListener('mousemove', (e) => {
   if (!isDragging) return;
+  // Ignore drag if sidebar collapsed
+  const layoutEl = document.querySelector('.layout');
+  if (layoutEl && layoutEl.classList.contains('sidebar-collapsed')) return;
   const deltaX = e.clientX - startX;
   const newWidth = Math.max(150, Math.min(800, startWidth + deltaX));
   document.querySelector('.layout').style.gridTemplateColumns = `${newWidth}px 4px 1fr`;
+  lastSidebarWidth = newWidth; // update live
+  updateHideFabPosition();
 });
 
 document.addEventListener('mouseup', () => {
@@ -959,6 +965,39 @@ document.addEventListener('mousedown', (e) => {
       iframe.style.pointerEvents = 'none';
     }
   }
+});
+
+// Touch support for splitter drag
+ui.splitter.addEventListener('touchstart', (e) => {
+  if (e.touches.length !== 1) return;
+  isDragging = true;
+  startX = e.touches[0].clientX;
+  startWidth = ui.sidebar.offsetWidth;
+  document.body.style.userSelect = 'none';
+  e.preventDefault();
+}, { passive: false });
+
+document.addEventListener('touchmove', (e) => {
+  if (!isDragging || e.touches.length !== 1) return;
+  const layoutEl = document.querySelector('.layout');
+  if (layoutEl && layoutEl.classList.contains('sidebar-collapsed')) return;
+  const deltaX = e.touches[0].clientX - startX;
+  const newWidth = Math.max(150, Math.min(800, startWidth + deltaX));
+  document.querySelector('.layout').style.gridTemplateColumns = `${newWidth}px 4px 1fr`;
+  lastSidebarWidth = newWidth;
+  updateHideFabPosition();
+  e.preventDefault();
+}, { passive: false });
+
+document.addEventListener('touchend', () => {
+  if (isDragging) {
+    isDragging = false;
+    document.body.style.userSelect = '';
+  }
+});
+
+window.addEventListener('resize', () => {
+  updateHideFabPosition();
 });
 
 // Collapse/Expand all folders functionality
@@ -1041,6 +1080,90 @@ if (ui.showMediaToggle) {
   });
 }
 
+// Floating hide/show buttons
+function ensureHideFab() {
+  const layout = document.querySelector('.layout');
+  if (!layout || layout.classList.contains('sidebar-collapsed')) return;
+  if (!document.getElementById('sidebar-hide-fab')) {
+    const btn = document.createElement('button');
+    btn.id = 'sidebar-hide-fab';
+    btn.type = 'button';
+    btn.ariaLabel = 'Hide sidebar';
+    btn.textContent = '◀';
+    btn.style.cssText = 'position:fixed;top:14px;left:0;z-index:2500;background:#6c757d;color:#fff;border:none;border-radius:4px;padding:6px 10px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.25);font-size:14px;transition:left .15s ease;';
+    btn.addEventListener('click', () => collapseSidebar());
+    document.body.appendChild(btn);
+  }
+  updateHideFabPosition();
+  // extra delayed adjustments (layout shifts, fonts loading, etc.)
+  requestAnimationFrame(updateHideFabPosition);
+  setTimeout(updateHideFabPosition, 60);
+  setTimeout(updateHideFabPosition, 180);
+}
+
+function updateHideFabPosition(){
+  const btn = document.getElementById('sidebar-hide-fab');
+  const layout = document.querySelector('.layout');
+  if (!btn || !layout || layout.classList.contains('sidebar-collapsed')) return;
+  try {
+    const splitterRect = ui.splitter.getBoundingClientRect();
+    const inset = 8;
+    btn.style.left = `${splitterRect.right + inset}px`;
+  } catch {}
+}
+
+function collapseSidebar(){
+  const layout = document.querySelector('.layout');
+  if (!layout || layout.classList.contains('sidebar-collapsed')) return;
+  lastSidebarWidth = ui.sidebar.offsetWidth || lastSidebarWidth;
+  layout.classList.add('sidebar-collapsed');
+  layout.style.removeProperty('grid-template-columns');
+  removeHideFab();
+  createFloatingSidebarRestore();
+}
+
+function removeHideFab(){
+  const btn = document.getElementById('sidebar-hide-fab');
+  if (btn) btn.remove();
+}
+
+
+function createFloatingSidebarRestore() {
+  if (document.getElementById('sidebar-restore-fab')) return; // already exists
+  const btn = document.createElement('button');
+  btn.id = 'sidebar-restore-fab';
+  btn.type = 'button';
+  btn.ariaLabel = 'Show sidebar';
+  btn.textContent = '▶';
+  btn.style.cssText = `
+    position: fixed;
+    top: 14px;
+    left: 10px;
+    z-index: 2500;
+    background: #6c757d;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 10px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,.25);
+    font-size: 14px;
+  `;
+  btn.addEventListener('click', () => {
+    const layout = document.querySelector('.layout');
+    layout.classList.remove('sidebar-collapsed');
+    layout.style.gridTemplateColumns = `${lastSidebarWidth}px 4px 1fr`;
+  removeFloatingSidebarRestore();
+  ensureHideFab();
+  });
+  document.body.appendChild(btn);
+}
+
+function removeFloatingSidebarRestore() {
+  const btn = document.getElementById('sidebar-restore-fab');
+  if (btn) btn.remove();
+}
+
 // Initialize editor module when the page loads
 document.addEventListener('DOMContentLoaded', () => {
   // Feature detection
@@ -1076,6 +1199,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
   try { editorModule = new EditorModule(); console.log('Editor module initialized'); } catch(e){ console.error('Failed to initialize editor module:', e); }
+  ensureHideFab();
 });
 
 // Also initialize if DOMContentLoaded has already fired

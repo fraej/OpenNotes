@@ -45,7 +45,10 @@ body {
 }
 .muted { color: var(--muted); }
 
-.layout { display: grid; grid-template-columns: 320px 4px 1fr; height: 100vh; }
+.layout { display: grid; grid-template-columns: 320px 4px 1fr; height: 100vh; transition: grid-template-columns .25s ease; }
+.layout.sidebar-collapsed { grid-template-columns: 0 0 1fr; }
+.layout.sidebar-collapsed .sidebar { overflow: hidden; }
+.layout.sidebar-collapsed .splitter { cursor: default; }
 .sidebar {
   border-right: none;
   background: var(--panel-2);
