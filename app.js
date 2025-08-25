@@ -445,15 +445,30 @@ async function openFile(node, path) {
 
 function renderImage(blobUrl, name){
   clearViewer();
-  ui.viewer.style.overflow='auto';
+  // Wrap in flex container to center both horizontally and vertically while allowing scroll if oversized
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = `
+    position:relative;
+    width:100%;
+    height:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:auto;
+    padding:0.5rem;
+    box-sizing:border-box;
+  `;
   const img = document.createElement('img');
   img.src = blobUrl;
   img.alt = name;
   img.style.maxWidth='100%';
-  img.style.height='auto';
+  img.style.maxHeight='100%';
+  img.style.objectFit='contain';
   img.style.display='block';
-  img.style.margin='0 auto';
-  ui.viewer.appendChild(img);
+  wrapper.appendChild(img);
+  // Reset viewer overflow (wrapper manages scroll)
+  ui.viewer.style.overflow='hidden';
+  ui.viewer.appendChild(wrapper);
 }
 
 function renderVideo(blobUrl, name){
