@@ -780,15 +780,38 @@ function renderHTML(htmlText) {
 
 function renderPDF(blobUrl) {
   clearViewer();
-  // Hide scrollbars but keep overflow detection for splitter
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const wantsNewTab = isMobile; // current rule: always new tab on mobile (Chrome Android issue)
+
+  if (wantsNewTab) {
+    // Try opening in a new tab immediately.
+    const opened = window.open(blobUrl, '_blank');
+    if (!opened) {
+      // Popup blocked – show manual link
+      ui.viewer.innerHTML = '<div class="placeholder" style="padding:1.25rem;line-height:1.5">PDF preview is opened in a new tab. If it did not open, <a id="openPdfLink" href="#">tap here</a> to open it.</div>';
+      const link = document.getElementById('openPdfLink');
+      if (link) link.addEventListener('click', (e) => { e.preventDefault(); window.open(blobUrl, '_blank'); });
+    } else {
+      ui.viewer.innerHTML = '<div class="placeholder" style="padding:1.25rem;line-height:1.5">PDF opened in a new tab. You can switch back here to select other files.</div>';
+    }
+    return;
+  }
+
+  // Desktop: still embed, but offer open-in-new-tab button
   ui.viewer.style.overflowY = 'hidden';
   ui.viewer.style.overflowX = 'hidden';
-  
+  const toolbar = document.createElement('div');
+  toolbar.style.cssText = 'display:flex;justify-content:flex-end;gap:8px;padding:6px 8px;background:#f5f5f5;border-bottom:1px solid #ddd;';
+  const openBtn = document.createElement('button');
+  openBtn.textContent = 'Open in New Tab';
+  openBtn.style.cssText = 'background:#007acc;color:#fff;border:none;padding:6px 10px;border-radius:4px;cursor:pointer;font-size:13px;';
+  openBtn.addEventListener('click', () => { window.open(blobUrl, '_blank'); });
+  toolbar.appendChild(openBtn);
+  ui.viewer.appendChild(toolbar);
+
   const iframe = document.createElement('iframe');
   iframe.className = 'pdf-frame';
-  // Add #toolbar=0 to hide PDF viewer toolbar and controls
-  iframe.src = blobUrl + '#toolbar=0&navpanes=0&scrollbar=0&statusbar=0&messages=0&scrollbar=0&view=FitH';
-  // Note: no sandbox applied so the built-in PDF viewer can function correctly.
+  iframe.src = blobUrl + '#view=FitH';
   ui.viewer.appendChild(iframe);
 }
 
